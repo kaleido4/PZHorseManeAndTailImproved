@@ -25,7 +25,8 @@ HAIR_TEXTURE = os.path.join(PZ_DIR, "media", "textures", "F_Hair_White.png")
 BODIES = ["Mare", "Mare_NoHead", "Stallion", "Stallion_NoHead"]
 TAIL_BONES = ["DEF_Tail1", "DEF_Tail2", "DEF_Tail3"]
 MANE_BONES = ["DEF_ManeStart", "DEF_ManeMid1", "DEF_ManeMid2", "DEF_ManeMid3", "DEF_ManeMid4", "DEF_ManeMid5", "DEF_ManeEnd"]
-MANE_PIECE_FOR_BONE = {
+# the Horse mod's mane meshes (models_X/HorseMod), one shared by the five middle bones
+HORSE_MANE_FOR_BONE = {
     "DEF_ManeStart": "SimpleManeStart",
     "DEF_ManeMid1": "SimpleManeMid",
     "DEF_ManeMid2": "SimpleManeMid",
@@ -34,6 +35,10 @@ MANE_PIECE_FOR_BONE = {
     "DEF_ManeMid5": "SimpleManeMid",
     "DEF_ManeEnd": "SimpleManeEnd",
 }
+# this mod's mane meshes (models_X/HorseManeTailImproved), one per bone; named after the
+# Horse mod's attachment slots, which lua/client/HorseManeTailImproved/ManeModels.lua maps
+MANE_FOR_BONE = {bone: bone[len("DEF_"):] for bone in MANE_BONES}
+OUT_MANES = os.path.join(MOD_MEDIA, "models_X", "HorseManeTailImproved")
 # Mane colors from HorseMod/attachments/AttachmentData.lua, used for previews only.
 MANE_HEX = {
     "AmericanQuarterPalomino": "#EADAB6",

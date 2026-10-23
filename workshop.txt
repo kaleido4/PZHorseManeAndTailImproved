@@ -3,12 +3,12 @@ title=Horse Mane & Tail improved
 description=New mane and tail models for the adult horses of the [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3661336777]Horse[/url] mod.
 description=
 description=[list]
-description=[*]Mane: layered locks that fall to one side of the neck, with a forelock between the ears. Still tinted in each breed's mane colour.
-description=[*]Tail: longer and fuller, with a proper dock. Still painted in each breed's tail colour.
+description=[*]Mane: long and full, in locks that bow back along the neck and end in sharp points, cut in a V, with a pointed forelock. Still tinted in each breed's mane colour.
+description=[*]Tail: long and full, cut straight across at the bottom (a banged tail). Still painted in each breed's tail colour.
 description=[*]Mares and stallions share the new models. Foals are unchanged.
 description=[/list]
 description=
 description=Requires the Horse mod, and must load after it.
-description=Only replaces models: no Lua, no scripts, no sandbox options. Can be added to or removed from an existing save.
+description=Nothing is saved: can be added to or removed from an existing save.
 tags=Build 42;Models;Realistic
 visibility=public

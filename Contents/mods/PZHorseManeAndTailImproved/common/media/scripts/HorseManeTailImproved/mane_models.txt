@@ -1,0 +1,54 @@
+module HorseManeTailImproved {
+
+    /* One mane model per mane bone of an adult horse; lua/client/HorseManeTailImproved/ManeModels.lua
+       puts them on the Horse mod's mane items. Foals keep the Horse mod's own manes. */
+
+    model ManeStart {
+        mesh = HorseManeTailImproved/ManeStart,
+        texture = HorseManeTailImproved/ManeStrands,
+        static = true,
+        scale = 1.00,
+    }
+
+    model ManeMid1 {
+        mesh = HorseManeTailImproved/ManeMid1,
+        texture = HorseManeTailImproved/ManeStrands,
+        static = true,
+        scale = 1.00,
+    }
+
+    model ManeMid2 {
+        mesh = HorseManeTailImproved/ManeMid2,
+        texture = HorseManeTailImproved/ManeStrands,
+        static = true,
+        scale = 1.00,
+    }
+
+    model ManeMid3 {
+        mesh = HorseManeTailImproved/ManeMid3,
+        texture = HorseManeTailImproved/ManeStrands,
+        static = true,
+        scale = 1.00,
+    }
+
+    model ManeMid4 {
+        mesh = HorseManeTailImproved/ManeMid4,
+        texture = HorseManeTailImproved/ManeStrands,
+        static = true,
+        scale = 1.00,
+    }
+
+    model ManeMid5 {
+        mesh = HorseManeTailImproved/ManeMid5,
+        texture = HorseManeTailImproved/ManeStrands,
+        static = true,
+        scale = 1.00,
+    }
+
+    model ManeEnd {
+        mesh = HorseManeTailImproved/ManeEnd,
+        texture = HorseManeTailImproved/ManeStrands,
+        static = true,
+        scale = 1.00,
+    }
+}

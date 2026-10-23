@@ -1,7 +1,9 @@
 """Replaces the tail inside the mare/stallion body meshes.
 
 The old tail triangles (all three corners weighted to DEF_Tail1-3) are removed
-and a new dock plus hair clumps are added, skinned to the same tail bones.
+and a new tail is added, skinned to the same tail bones: one bundle of hair that
+grows out of the dock, hangs straight down close behind the hindquarters and is
+cut straight across at the bottom. Grooves around the bundle give the strands.
 UVs land inside the original tail UV island, which every breed texture paints
 in its tail colour.
 """
@@ -11,31 +13,37 @@ import numpy as np
 
 import glb
 from common import Body, TAIL_BONES, smooth_normals, unit
-from hair import Clump, catmull_rom, merge
+from forelock import forelock_part
+from hair import merge
 
-RINGS = 6
-TAIL_CENTRE_Z = -0.522
-DEPTH_SCALE = 0.5      # bundle is flatter front-to-back than side-to-side
 UV_V = (0.318, 0.462)  # v range that stays clear of the pointed strip ends
 UV_MARGIN = 2.5 / 1024
+UV_STRIP = 1           # which of the four tail strips the bundle is mapped onto
 
-# (angle from straight back in degrees, root position along the dock 0..1, tip height, outward layer)
-CLUMPS = [
-    (0, 0.08, 0.300, 0.008),
-    (20, 0.14, 0.312, 0.000),
-    (-20, 0.14, 0.306, 0.000),
-    (42, 0.24, 0.322, 0.008),
-    (-42, 0.24, 0.326, 0.008),
-    (65, 0.34, 0.338, 0.000),
-    (-65, 0.34, 0.334, 0.000),
-    (90, 0.46, 0.350, 0.008),
-    (-90, 0.46, 0.354, 0.008),
-    (115, 0.60, 0.372, 0.000),
-    (-115, 0.60, 0.368, 0.000),
+TAIL_BOTTOM = 0.18     # height of the straight cut (the hock is at ~0.35, the ground at 0)
+SIDES = 24             # around the bundle; every other one is a groove between strands
+# how deep each groove cuts in, per strand, so they do not look machined
+STRAND_DEPTH = [0.34, 0.24, 0.38, 0.28, 0.20, 0.36, 0.30, 0.22, 0.35, 0.26, 0.32, 0.21]
+STRAND_BULGE = [0.04, -0.03, 0.06, 0.00, -0.04, 0.05, 0.02, -0.02, 0.05, -0.01, 0.03, -0.05]
+# Below the last tail bone the hair would swing as one rigid plank when the tail
+# lifts. Part of its weight stays with the body so it trails and droops instead;
+# the extra rings down there let that droop bend smoothly.
+TRAIL_START = 0.48     # height where trailing starts (end of DEF_Tail3)
+TRAIL_MAX = 0.30       # share of body weight at the cut
+# (height, centre z, half width, half depth, groove scale) from the dock down to the cut.
+# Below DEF_Tail3 (~0.48) the hair is rigid, so few rings are needed there.
+PROFILE = [
+    (0.814, -0.428, 0.028, 0.028, 0.0),
+    (0.795, -0.456, 0.035, 0.033, 0.3),
+    (0.760, -0.489, 0.048, 0.040, 0.7),
+    (0.705, -0.511, 0.058, 0.045, 1.0),
+    (0.620, -0.522, 0.062, 0.047, 1.0),
+    (0.500, -0.526, 0.065, 0.048, 1.0),
+    (0.420, -0.526, 0.067, 0.048, 1.0),
+    (0.340, -0.526, 0.069, 0.049, 1.0),
+    (0.260, -0.525, 0.070, 0.049, 1.0),
+    (TAIL_BOTTOM, -0.524, 0.072, 0.050, 1.0),
 ]
-DOCK_PATH = [(0, 0.812, -0.430), (0, 0.792, -0.462), (0, 0.750, -0.488), (0, 0.700, -0.505), (0, 0.655, -0.512)]
-DOCK_RADIUS = [0.034, 0.034, 0.032, 0.028, 0.024, 0.018]
-DOCK_SIDES = 6
 
 
 class TailIsland:
@@ -89,71 +97,63 @@ class TailIsland:
         return uv
 
 
-def radial(theta_deg):
-    th = np.radians(theta_deg)
-    return np.array([np.sin(th), 0.0, -np.cos(th) * DEPTH_SCALE])
+def bundle(island):
+    """The tail as one tube from the dock to the cut, plus caps at both ends.
 
-
-def dock(island):
-    path = catmull_rom(DOCK_PATH, len(DOCK_RADIUS))
-    T = unit(np.gradient(path, axis=0))
-    uvmap = island.mapper(0)
+    Returns three parts (tube, cut, root cap) so each gets its own normals: the
+    cut keeps a crisp edge instead of being rounded into the sides.
+    """
+    prof = np.array(PROFILE)
+    centres = np.c_[np.zeros(len(prof)), prof[:, 0], prof[:, 1]]
+    T = unit(np.gradient(centres, axis=0))
+    lat = np.array([1.0, 0.0, 0.0])
+    uvmap = island.mapper(UV_STRIP)
+    n_rings = len(prof)
+    rings = []
     pos, uvs = [], []
-    for k, (p, r) in enumerate(zip(path, DOCK_RADIUS)):
-        side = unit(np.cross(T[k], [1.0, 0, 0]))
-        lat = np.array([1.0, 0, 0])
-        for j in range(DOCK_SIDES + 1):
-            a = 2 * np.pi * j / DOCK_SIDES
-            pos.append(p + r * (np.cos(a) * lat + np.sin(a) * side))
-            uvs.append(uvmap(k / (len(path) - 1), j / DOCK_SIDES))
+    for k, (c, (_, _, w, d, groove)) in enumerate(zip(centres, prof)):
+        depth_axis = unit(np.cross(T[k], lat))
+        ring = []
+        for j in range(SIDES + 1):
+            a = 2 * np.pi * j / SIDES
+            # odd vertices sit in the grooves, even ones on the strand ridges
+            strand = (j // 2) % len(STRAND_DEPTH)
+            r = 1 - groove * STRAND_DEPTH[strand] if j % 2 else 1 + groove * STRAND_BULGE[strand]
+            ring.append(c + r * (w * np.cos(a) * lat + d * np.sin(a) * depth_axis))
+            uvs.append(uvmap(k / (n_rings - 1), j / SIDES))
+        rings.append(ring)
+        pos += ring
+    pos = np.array(pos)
+    per = SIDES + 1
     tris = []
-    ring = DOCK_SIDES + 1
-    for k in range(len(path) - 1):
-        for j in range(DOCK_SIDES):
-            a0, b0 = k * ring + j, k * ring + j + 1
-            a1, b1 = a0 + ring, b0 + ring
+    for k in range(n_rings - 1):
+        for j in range(SIDES):
+            a0, b0 = k * per + j, k * per + j + 1
+            a1, b1 = a0 + per, b0 + per
             tris += [(a0, a1, b0), (b0, a1, b1)]
-    end = len(pos)
-    pos.append(path[-1] + T[-1] * 0.01)
-    uvs.append(uvmap(1.0, 0.5))
-    last = (len(path) - 1) * ring
-    tris += [(last + j, end, last + j + 1) for j in range(DOCK_SIDES)]
-    pos, tris = np.array(pos), np.array(tris)
-    # wind outwards from the dock axis
-    centre = np.vstack([path, path[-1:]])[np.minimum(np.arange(len(pos)) // ring, len(path))]
+    tris = np.array(tris)
+    ring_of = np.arange(len(pos)) // per
     p = pos[tris]
     fn = np.cross(p[:, 1] - p[:, 0], p[:, 2] - p[:, 0])
-    flip = (fn * (p.mean(axis=1) - centre[tris].mean(axis=1))).sum(axis=1) < 0
+    away = p.mean(axis=1) - centres[ring_of[tris]].mean(axis=1)
+    flip = (fn * away).sum(axis=1) < 0
     tris[flip] = tris[flip][:, ::-1]
-    return pos, np.array(uvs), tris, path
+    tube = (pos, np.array(uvs), tris)
 
+    def cap(k, facing):
+        ring = np.array(rings[k][:SIDES])
+        cpos = np.vstack([ring, centres[k]])
+        cuv = [uvmap(k / (n_rings - 1), j / SIDES) for j in range(SIDES)] + [uvmap(k / (n_rings - 1), 0.5)]
+        ctris = []
+        for j in range(SIDES):
+            tri = (j, (j + 1) % SIDES, SIDES)
+            q = cpos[list(tri)]
+            if np.dot(np.cross(q[1] - q[0], q[2] - q[0]), facing) < 0:
+                tri = tri[::-1]
+            ctris.append(tri)
+        return cpos, np.array(cuv), np.array(ctris)
 
-def hair_clump(island, dock_path, index, theta, root_at, tip_y, layer):
-    rad = radial(theta)
-    k = root_at * (len(dock_path) - 1)
-    i = min(int(k), len(dock_path) - 2)
-    d = dock_path[i] + (k - i) * (dock_path[i + 1] - dock_path[i])
-    r = np.interp(root_at, np.linspace(0, 1, len(DOCK_RADIUS)), DOCK_RADIUS)
-
-    def centre(y, z=TAIL_CENTRE_Z):
-        return np.array([0.0, y, z])
-    pts = [
-        d + rad * r * 0.5,
-        d + rad * (r + 0.010 + layer) + np.array([0, -0.030, -0.004]),
-        centre(0.62) + rad * (0.042 + layer),
-        centre(0.48) + rad * (0.052 + layer),
-        centre(tip_y + 0.065, TAIL_CENTRE_Z + 0.004) + rad * (0.044 + layer),
-        centre(tip_y, TAIL_CENTRE_Z + 0.006) + rad * 0.034,
-    ]
-    path = catmull_rom(pts, RINGS + 1)
-    s = np.linspace(0, 1, RINGS + 1)
-    w = np.interp(s, [0, 0.3, 0.8, 1], [0.050, 0.072, 0.060, 0.015])
-    h = np.interp(s, [0, 0.3, 0.8, 1], [0.016, 0.018, 0.014, 0.004])
-    across = unit(np.cross([0.0, 1.0, 0.0], rad))
-
-    def outward(p, t):
-        return unit(np.array([p[0], 0.0, (p[2] - TAIL_CENTRE_Z) / DEPTH_SCALE]) + 1e-6)
-    return Clump(path, w, h, across, outward, island.mapper(index % 4)).build()
+    return [tube, cap(n_rings - 1, T[-1]), cap(0, -T[0])]
 
 
 def chain_param(body, positions):
@@ -179,6 +179,8 @@ def skin_weights(body, positions):
     sc = np.clip(s, 0.5, 2.5)
     w = np.stack([np.maximum(0, 1 - np.abs(sc - (k + 0.5))) for k in range(3)], axis=1)
     spine = np.clip((0.22 - s) / 0.22, 0, 1) * 0.85
+    trail = np.clip((TRAIL_START - positions[:, 1]) / (TRAIL_START - TAIL_BOTTOM), 0, 1) * TRAIL_MAX
+    spine = np.maximum(spine, trail)
     w = w * (1 - spine)[:, None]
     joints = np.zeros((len(positions), 4), np.uint8)
     weights = np.zeros((len(positions), 4), np.float32)
@@ -197,12 +199,8 @@ def skin_weights(body, positions):
 
 
 def tail_geometry(body):
-    island = TailIsland(body)
-    dpos, duv, dtris, dpath = dock(island)
-    parts = [(dpos, duv, dtris)]
-    for i, (theta, root_at, tip_y, layer) in enumerate(CLUMPS):
-        parts.append(hair_clump(island, dpath, i, theta, root_at, tip_y, layer))
-    return merge(parts)
+    """Tail parts as [(positions, uvs, tris)]; normals are computed per part."""
+    return bundle(TailIsland(body))
 
 
 def hole_caps(body, all_tris, keep_tris):
@@ -258,7 +256,9 @@ def hole_caps(body, all_tris, keep_tris):
     return np.array(corners, int), np.array(tris, int).reshape(-1, 3)
 
 
-def graft(src_path, dst_path):
+def graft(src_path, dst_path, with_forelock=True):
+    """Write src_path's body to dst_path with the new tail, and the forelock unless
+    the body has no head."""
     body = Body(src_path)
     a = body.attrs
     tris = body.indices.reshape(-1, 3)
@@ -274,9 +274,16 @@ def graft(src_path, dst_path):
     cap_uv = np.repeat(a["TEXCOORD_0"][corners[:1]], len(corners), axis=0)
     cap_nrm = np.repeat(unit(a["NORMAL"][corners].mean(axis=0, keepdims=True)), len(corners), axis=0)
 
-    tpos, tuv, ttris = tail_geometry(body)
-    tnorm = smooth_normals(tpos, ttris)
+    parts = tail_geometry(body)
+    tpos, tuv, ttris = merge(parts)
+    tnorm = np.vstack([smooth_normals(p, t) for p, _, t in parts])
     tjoints, tweights = skin_weights(body, tpos)
+    if with_forelock:
+        fpos, fuv, ftris, fjoints, fweights = forelock_part(body, TailIsland(body))
+        ttris = np.vstack([ttris, ftris + len(tpos)])
+        tnorm = np.vstack([tnorm, smooth_normals(fpos, ftris)])
+        tpos, tuv = np.vstack([tpos, fpos]), np.vstack([tuv, fuv])
+        tjoints, tweights = np.vstack([tjoints, fjoints]), np.vstack([tweights, fweights])
     n_tail = len(tpos)
 
     pos = np.vstack([a["POSITION"][used], a["POSITION"][corners], tpos]).astype(np.float32)

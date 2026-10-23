@@ -15,8 +15,8 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import glb  # noqa: E402
-from common import (Body, Pose, HAIR_TEXTURE, HORSE_TEXTURES, MANE_BONES, MANE_HEX,  # noqa: E402
-                    MANE_PIECE_FOR_BONE)
+from common import (Body, Pose, HAIR_TEXTURE, HORSE_MANE_FOR_BONE, HORSE_MOD, HORSE_TEXTURES, MANE_BONES,  # noqa: E402
+                    MANE_FOR_BONE, MANE_HEX)
 
 # glTF (+Y up, +Z forward) -> Blender (+Z up, -Y forward)
 G2B = np.array([[1, 0, 0, 0], [0, 0, -1, 0], [0, 1, 0, 0], [0, 0, 0, 1]], float)
@@ -35,6 +35,8 @@ VIEWS = {
     "tail_side": ((-2.4, 0.45, 0.6), (0, 0.45, 0.58), 0.85),
     "neck_l": ((1.6, -0.9, 1.25), (0, -0.42, 0.95), 0.85),
     "face": ((-0.5, -2.4, 1.25), (0, -0.7, 1.0), 0.7),
+    "head_low": ((-1.3, -1.2, 0.75), (0, -0.62, 0.38), 0.75),  # the head down while eating
+    "poll": ((-1.4, -0.75, 1.2), (0, -0.62, 1.03), 0.38),
 }
 
 
@@ -88,17 +90,29 @@ def add_mesh(name, positions, tris, uvs, mat):
 
 def build_scene(models, body_name, breed, anim, time):
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    body = Body(os.path.join(models, "Horse", body_name + ".glb"))
+    foal = body_name.startswith("Foal")
+    body_dir = os.path.join(HORSE_MOD, "common", "media", "models_X", "HorseMod", "Foal") if foal else os.path.join(models, "Horse")
+    body = Body(os.path.join(body_dir, body_name + ".glb"))
     pose = Pose(body, anim, time) if anim else Pose(body)
     a = body.attrs
     posed = pose.skin(a["POSITION"].astype(float), a["JOINTS_0"], a["WEIGHTS_0"])
     body_mat = material("body", os.path.join(HORSE_TEXTURES, f"Horse_{breed}.png"))
     add_mesh("body", posed, body.indices.reshape(-1, 3), a["TEXCOORD_0"], body_mat)
 
-    mane_mat = material("mane", HAIR_TEXTURE, tint=hex_to_linear(MANE_HEX[breed]))
+    # this mod keeps one mane mesh per bone and its texture next to the HorseMod folder;
+    # the Horse mod shares one mesh between the middle bones and uses the vanilla hair texture
+    our_manes = os.path.abspath(os.path.join(models, "..", "HorseManeTailImproved"))
+    ours = os.path.isdir(our_manes) and not foal
+    if ours:
+        mane_dir, mane_names = our_manes, MANE_FOR_BONE
+        mane_tex = os.path.abspath(os.path.join(models, "..", "..", "textures", "HorseManeTailImproved", "ManeStrands.png"))
+    else:
+        mane_dir, mane_names, mane_tex = models, HORSE_MANE_FOR_BONE, HAIR_TEXTURE
+        if foal:  # foals always get the Horse mod's manes
+            mane_dir = os.path.join(HORSE_MOD, "common", "media", "models_X", "HorseMod")
+    mane_mat = material("mane", mane_tex, tint=hex_to_linear(MANE_HEX[breed]))
     for bone in MANE_BONES:
-        piece = MANE_PIECE_FOR_BONE[bone]
-        g, b = glb.read(os.path.join(models, piece + ".glb"))
+        g, b = glb.read(os.path.join(mane_dir, mane_names[bone] + ".glb"))
         pa, idx = glb.primitive_arrays(g, b)
         local = np.eye(4)
         local[:3, 3] = ATTACH_OFFSET.get(bone, (0, 0, 0))

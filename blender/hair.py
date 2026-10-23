@@ -101,6 +101,68 @@ class Clump:
         return positions, np.array(uvs), tris
 
 
+class Sheet:
+    """A closed slab of hair spanned by several paths ("lines") side by side.
+
+    lines:     (C+1, R, 3) points; every line runs root to tip with R points. Lines
+               of different lengths give the bottom edge its points and notches.
+    thickness: (C+1, R) slab thickness at each point; keep it above 0 so the inner
+               and outer surfaces never share a vertex (that would break smooth normals).
+    outward:   function(point) -> rough direction away from the body.
+    uv:        function(s, t) -> (u, v); s runs root to tip, t across the lines.
+    """
+
+    def __init__(self, lines, thickness, outward, uv, closed=True):
+        self.lines = np.asarray(lines, float)
+        self.thickness = np.asarray(thickness, float)
+        self.outward = outward
+        self.uv = uv
+        # a sheet only a few millimetres thick does not need its edges closed;
+        # the two faces alone keep it visible from both sides
+        self.closed = closed
+
+    def build(self):
+        L = self.lines
+        ncol, nrow = L.shape[:2]
+        d_s = np.gradient(L, axis=1)
+        d_t = np.gradient(L, axis=0)
+        n = unit(np.cross(d_s, d_t))
+        ref = np.array([[self.outward(p) for p in line] for line in L])
+        n *= np.sign((n * ref).sum(axis=2, keepdims=True) + 1e-12)
+        inner = L
+        outer = L + n * self.thickness[..., None]
+        grid_uv = np.array([[self.uv(r / (nrow - 1), c / (ncol - 1)) for r in range(nrow)] for c in range(ncol)])
+
+        positions = np.vstack([inner.reshape(-1, 3), outer.reshape(-1, 3)])
+        uvs = np.vstack([grid_uv.reshape(-1, 2), grid_uv.reshape(-1, 2)])
+        off = ncol * nrow
+
+        def vid(layer, c, r):
+            return layer * off + c * nrow + r
+
+        quads = []  # (a, b, c, d, wanted normal)
+        for c in range(ncol - 1):
+            for r in range(nrow - 1):
+                for layer, sign in ((0, -1), (1, 1)):
+                    q = (vid(layer, c, r), vid(layer, c + 1, r), vid(layer, c + 1, r + 1), vid(layer, c, r + 1))
+                    quads.append((q, sign * n[c, r]))
+        for c, sign in ((0, -1), (ncol - 1, 1)) if self.closed else ():  # the two side edges
+            for r in range(nrow - 1):
+                q = (vid(0, c, r), vid(0, c, r + 1), vid(1, c, r + 1), vid(1, c, r))
+                quads.append((q, sign * unit(d_t[c, r])))
+        for r, sign in ((0, -1), (nrow - 1, 1)) if self.closed else ():  # root and tip edges
+            for c in range(ncol - 1):
+                q = (vid(0, c, r), vid(0, c + 1, r), vid(1, c + 1, r), vid(1, c, r))
+                quads.append((q, sign * unit(d_s[c, r])))
+        tris = []
+        for (a, b, c, d), want in quads:
+            for tri in ((a, b, c), (a, c, d)):
+                p = positions[list(tri)]
+                fn = np.cross(p[1] - p[0], p[2] - p[0])
+                tris.append(tri if np.dot(fn, want) >= 0 else tri[::-1])
+        return positions, uvs, np.array(tris)
+
+
 def merge(parts):
     """Concatenate (positions, uvs, tris, extra...) tuples into one mesh."""
     pos, uv, tri = [], [], []
