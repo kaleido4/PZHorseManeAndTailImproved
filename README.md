@@ -33,6 +33,7 @@ Things worth knowing:
 - With one model shared by the five middle bones, a long mane could only be as long everywhere, and the bones near the head tilt differently, so it fanned forwards under the jaw. One model per bone lets every piece fit its own part of the neck, and the V is set as how far each lock's tip hangs below where it roots on the crest (`V_CUT`), solved per lock.
 - Horses do not save their attached items; the Horse mod recreates the manes every session. The per-bone model lives in the mane item's mod data, so nothing of it is saved, and removing this mod brings back the original manes.
 - Every other lock sits a little further out (`LOCK_LAYER`), so overlapping locks stack instead of cutting through each other.
+- The mane and forelock are shaded with the normals of the hair mass, not of each lock (`mass_normals`): up on top of the crest, turning to face the side down the neck, and out from the head for the forelock. With each lock's own rounded normals the game's light shaded every lock like a shiny metal tube; this way they light together as one soft clump. The texture is kept light for the same reason, since the breed tint is multiplied into it.
 - The forelock is in the body mesh rather than on the end mane bone, because that bone turns up to 18° against the head while grazing (10° at the gallop) and lifted the forelock off the face. In the body it is skinned to `DEF_Head`, its root blended into the neck like the skin under it, and it uses the tail strips of the breed texture. Each point is wrapped onto the skin around the head's outline (`NeckSections.wrap`), so it lies on the face even where it flows down the side.
 - Removing the old tail leaves a small opening in the rump; it is capped with two triangles.
 - The tail has only three bones and ends around the hock, so everything below would swing with `DEF_Tail3` like a plank. Its lower part is partly weighted to `DEF_Spine1` (up to 30% at the cut), which makes it trail and droop when the tail lifts.
@@ -55,7 +56,7 @@ The paths to the Horse mod and the game default to this machine's Steam folders;
 
 ### Previews
 
-`preview.py` assembles a horse the way the game does (posed by one of the Horse mod's animations, mane pieces on their bones, breed texture, mane texture and tint) and renders it in Blender:
+`preview.py` assembles a horse the way the game does (posed by one of the Horse mod's animations, mane pieces on their bones, breed texture, mane texture and tint, the models' own normals) and renders it in Blender. Blender's sun casts shadows the game does not, so thin dark lines under the forelock are a preview artefact:
 
 ```bash
 "E:/SteamLibrary/steamapps/common/Blender/blender.exe" --background --factory-startup --python blender/preview.py -- --models "Contents/mods/PZHorseManeAndTailImproved/common/media/models_X/HorseMod" --breed ThoroughbredBay --anim Horse_Gallop.glb --time 0.3 --out blender/_work/gallop.png

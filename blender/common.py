@@ -117,15 +117,15 @@ class Pose:
         cache = {}
         self.mats = {n: an.world(by_name[n], chans, t, cache) for n in body.joint_names}
 
-    def skin(self, positions, joints, weights):
-        """Linear blend skinning of mesh-space positions."""
+    def skin(self, positions, joints, weights, normals=False):
+        """Linear blend skinning of mesh-space positions (or, with normals=True, directions)."""
         skin_mats = np.stack([self.mats[n] @ self.body.ibm[i] for i, n in enumerate(self.body.joint_names)])
-        hom = np.c_[positions, np.ones(len(positions))]
+        hom = np.c_[positions, np.zeros(len(positions)) if normals else np.ones(len(positions))]
         out = np.zeros((len(positions), 3))
         for k in range(joints.shape[1]):
             m = skin_mats[joints[:, k].astype(int)]
             out += weights[:, k:k + 1] * np.einsum("nij,nj->ni", m, hom)[:, :3]
-        return out
+        return unit(out) if normals else out
 
 
 def unit(v):

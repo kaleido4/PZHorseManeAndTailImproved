@@ -17,7 +17,7 @@ import numpy as np
 
 import glb
 from common import Body, Pose, REFERENCE, MANE_BONES, MANE_FOR_BONE, unit
-from hair import Clump, catmull_rom, merge
+from hair import Clump, catmull_rom
 
 SIDE = -1             # hair falls to -X, the horse's right (off) side
 RINGS = 9             # points along a lock, tip included
@@ -40,9 +40,9 @@ V_CUT = [(0.0, 0.10), (0.30, 0.17), (0.76, 0.33), (1.0, 0.09)]
 LOCKS = {"DEF_ManeStart": [-0.11, -0.05, 0.0, 0.06], "DEF_ManeEnd": [-0.13, -0.08, -0.035]}
 MID_LOCKS = [-0.06, -0.005, 0.05]
 # Every lock gets its own shape from these ranges (seeded, so builds are repeatable):
-LOCK_WIDTH = (0.075, 0.115)   # widest point
-LOCK_SWEEP = (0.30, 0.55)     # how far back along the neck it sweeps, per unit of length
-LOCK_FLICK = (0.04, 0.16)     # how far its tip flicks forwards again, per unit of length
+LOCK_WIDTH = (0.105, 0.145)   # widest point
+LOCK_SWEEP = (0.38, 0.50)     # how far back along the neck it sweeps, per unit of length
+LOCK_FLICK = (0.06, 0.12)     # how far its tip flicks forwards again, per unit of length
 LOCK_JITTER = (-0.05, 0.04)   # added to its hanging length, so the tips are uneven
 SEED = 42
 # the filler under the bend of the locks
@@ -204,7 +204,32 @@ def lock(sections, z_c, length, layer, sweep, flick, width, shape=LOCK_SHAPE, ri
 
     def outward(p, t):
         return unit(np.array([p[0], 0.5 * (p[1] - centre_y), 0.0]))
-    return Clump(path, w, h, across, outward, hair_uv).build()
+    pos, uv, tris = Clump(path, w, h, across, outward, hair_uv).build()
+    return pos, uv, tris, mass_normals(pos, crest)
+
+
+def mass_normals(pos, crest):
+    """Normals of the hair mass rather than of each lock: up on top of the crest, turning
+    to face SIDE (and a little up) down the neck. With every lock's own rounded normals
+    the game's light shades each lock like a shiny tube; with these the locks light
+    together as one soft clump."""
+    k = np.clip((crest - pos[:, 1]) / 0.07, 0, 1)[:, None]
+    top = unit(np.stack([pos[:, 0] / 0.05, np.ones(len(pos)), np.zeros(len(pos))], axis=1))
+    side = unit(np.array([SIDE, 0.25, 0.0]))
+    return unit((1 - k) * top + k * side).astype(np.float32)
+
+
+def merge_with_normals(parts):
+    """Concatenate (positions, uvs, tris, normals) parts into one mesh."""
+    pos, uv, tri, nrm = [], [], [], []
+    base = 0
+    for p, u, t, n in parts:
+        pos.append(p)
+        uv.append(u)
+        tri.append(t + base)
+        nrm.append(n)
+        base += len(p)
+    return np.vstack(pos), np.vstack(uv), np.vstack(tri), np.vstack(nrm)
 
 
 # Forelock locks: (start across the forehead, length down the face, how far round
@@ -241,8 +266,11 @@ def forelock(sections, uv):
 
         def outward(p, t):
             return unit(np.r_[p[:2] - sec.centre(p[2]), 0.0])
-        locks.append(Clump(path, w, h, across, outward, uv).build())
-    return merge(locks)
+        pos, uvs, tris = Clump(path, w, h, across, outward, uv).build()
+        # shaded like the face under it (out from the head), not like a tube
+        normals = np.array([outward(p, None) for p in pos], np.float32)
+        locks.append((pos, uvs, tris, normals))
+    return merge_with_normals(locks)
 
 
 def solve_length(sections, M, z, target_y, layer, sweep, flick):
@@ -293,7 +321,7 @@ def build_pieces():
         filler_len = min(FILLER_LENGTH, 0.7 * min(lengths))
         locks.append(lock(sections, 0.5 * (min(zs) + max(zs)), filler_len, FILLER_LAYER, 0.15, 0.0,
                           span + FILLER_OVERLAP, FILLER_SHAPE, rings=6))
-        pieces[MANE_FOR_BONE[bone]] = merge(locks)
+        pieces[MANE_FOR_BONE[bone]] = merge_with_normals(locks)
     return pieces
 
 

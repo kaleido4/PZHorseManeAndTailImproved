@@ -12,15 +12,16 @@ from common import Pose
 
 
 def forelock_part(body, island):
-    """(positions, uvs, tris, joints, weights) of the forelock in the body's bind space."""
+    """(positions, uvs, tris, normals, joints, weights) of the forelock in the body's bind space."""
     frames = mane.bone_frames()
     sections, _, M_end = frames["DEF_ManeEnd"]
-    local, uvs, tris = mane.forelock([sections], island.mapper(2))
+    local, uvs, tris, local_normals = mane.forelock([sections], island.mapper(2))
 
     # where it sits on the idle-posed horse, and the posed skin under it
     pose = Pose(body, *mane.PROFILE_POSE)
     a = body.attrs
     world = (np.c_[local, np.ones(len(local))] @ M_end.T)[:, :3]
+    world_normals = local_normals @ M_end[:3, :3].T
     posed = pose.skin(a["POSITION"].astype(float), a["JOINTS_0"], a["WEIGHTS_0"])
     nearest = np.argmin(np.linalg.norm(posed[None, :, :] - world[:, None, :], axis=2), axis=1)
 
@@ -41,7 +42,10 @@ def forelock_part(body, island):
     # undo the skinning with those same weights to get bind-space positions
     skin = np.stack([pose.mats[n] @ body.ibm[i] for i, n in enumerate(body.joint_names)])
     bind = np.empty_like(world)
+    normals = np.empty_like(world)
     for v in range(len(world)):
-        S = sum(weights[v, k] * skin[joints[v, k]] for k in range(4))
-        bind[v] = (np.linalg.inv(S) @ np.r_[world[v], 1.0])[:3]
-    return bind, uvs, tris, joints, weights
+        S = np.linalg.inv(sum(weights[v, k] * skin[joints[v, k]] for k in range(4)))
+        bind[v] = (S @ np.r_[world[v], 1.0])[:3]
+        n = S[:3, :3] @ world_normals[v]
+        normals[v] = n / np.linalg.norm(n)
+    return bind, uvs, tris, normals.astype(np.float32), joints, weights

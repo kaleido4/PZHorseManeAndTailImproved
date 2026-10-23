@@ -279,9 +279,9 @@ def graft(src_path, dst_path, with_forelock=True):
     tnorm = np.vstack([smooth_normals(p, t) for p, _, t in parts])
     tjoints, tweights = skin_weights(body, tpos)
     if with_forelock:
-        fpos, fuv, ftris, fjoints, fweights = forelock_part(body, TailIsland(body))
+        fpos, fuv, ftris, fnorm, fjoints, fweights = forelock_part(body, TailIsland(body))
         ttris = np.vstack([ttris, ftris + len(tpos)])
-        tnorm = np.vstack([tnorm, smooth_normals(fpos, ftris)])
+        tnorm = np.vstack([tnorm, fnorm])
         tpos, tuv = np.vstack([tpos, fpos]), np.vstack([tuv, fuv])
         tjoints, tweights = np.vstack([tjoints, fjoints]), np.vstack([tweights, fweights])
     n_tail = len(tpos)

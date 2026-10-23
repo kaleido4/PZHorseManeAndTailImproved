@@ -37,10 +37,12 @@ def strands():
         c, w, a = rng.uniform(0, SIZE), rng.uniform(0.6, 1.3), rng.uniform(0.3, 1.0)
         d = np.abs((x - c + SIZE / 2) % SIZE - SIZE / 2)
         fine = np.maximum(fine, a * np.exp(-0.5 * (d / w) ** 2))
-    # each lock is darker towards its edges (u = 0 and 1), so neighbouring locks separate
+    # each lock is a little darker towards its edges (u = 0 and 1), so neighbouring locks
+    # separate; kept light, because the tint is multiplied in and a grey texture turns a
+    # white mane grey and makes the locks look like metal
     u = x / SIZE
-    edge = 0.70 + 0.30 * np.sin(np.pi * u) ** 0.7
-    across = (0.88 + 0.12 * fine) * edge
+    edge = 0.88 + 0.12 * np.sin(np.pi * u) ** 0.7
+    across = (0.95 + 0.05 * fine) * edge
 
     v = (np.arange(SIZE) + 0.5) / SIZE
     # strands drift a little sideways along their length so they do not look ruled
@@ -51,7 +53,7 @@ def strands():
         img[row] = np.interp(xs, x, across, period=SIZE)
     # shade the roots, where hair lies under the hair above it
     root = np.clip((v - HAIR_V[0]) / 0.08, 0, 1)
-    img *= (0.78 + 0.22 * root)[:, None]
+    img *= (0.86 + 0.14 * root)[:, None]
     gray = np.clip(img * 255, 0, 255).astype(np.uint8)
     return np.dstack([gray, gray, gray, np.full_like(gray, 255)])
 

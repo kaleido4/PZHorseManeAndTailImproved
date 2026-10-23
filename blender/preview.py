@@ -8,7 +8,6 @@ import argparse
 import os
 import sys
 
-import bmesh
 import bpy
 import numpy as np
 
@@ -67,7 +66,8 @@ def material(name, image, tint=None):
     return mat
 
 
-def add_mesh(name, positions, tris, uvs, mat):
+def add_mesh(name, positions, tris, uvs, mat, normals):
+    """Mesh in Blender coordinates, shaded with the file's own normals like the game does."""
     me = bpy.data.meshes.new(name)
     pb = (np.c_[positions, np.ones(len(positions))] @ G2B.T)[:, :3]
     me.from_pydata(pb.tolist(), [], tris.tolist())
@@ -76,12 +76,8 @@ def add_mesh(name, positions, tris, uvs, mat):
     me.loops.foreach_get("vertex_index", loop_vi)
     uvb = np.c_[uvs[:, 0], 1.0 - uvs[:, 1]]
     uvl.data.foreach_set("uv", uvb[loop_vi].reshape(-1))
-    bm = bmesh.new()
-    bm.from_mesh(me)
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
-    bm.to_mesh(me)
-    bm.free()
     me.shade_smooth()
+    me.normals_split_custom_set_from_vertices((np.asarray(normals) @ G2B[:3, :3].T).tolist())
     me.materials.append(mat)
     obj = bpy.data.objects.new(name, me)
     bpy.context.scene.collection.objects.link(obj)
@@ -96,8 +92,9 @@ def build_scene(models, body_name, breed, anim, time):
     pose = Pose(body, anim, time) if anim else Pose(body)
     a = body.attrs
     posed = pose.skin(a["POSITION"].astype(float), a["JOINTS_0"], a["WEIGHTS_0"])
+    posed_normals = pose.skin(a["NORMAL"].astype(float), a["JOINTS_0"], a["WEIGHTS_0"], normals=True)
     body_mat = material("body", os.path.join(HORSE_TEXTURES, f"Horse_{breed}.png"))
-    add_mesh("body", posed, body.indices.reshape(-1, 3), a["TEXCOORD_0"], body_mat)
+    add_mesh("body", posed, body.indices.reshape(-1, 3), a["TEXCOORD_0"], body_mat, posed_normals)
 
     # this mod keeps one mane mesh per bone and its texture next to the HorseMod folder;
     # the Horse mod shares one mesh between the middle bones and uses the vanilla hair texture
@@ -118,7 +115,9 @@ def build_scene(models, body_name, breed, anim, time):
         local[:3, 3] = ATTACH_OFFSET.get(bone, (0, 0, 0))
         M = pose.mats[bone] @ local
         world = (np.c_[pa["POSITION"], np.ones(len(pa["POSITION"]))] @ M.T)[:, :3]
-        add_mesh(bone, world, idx.reshape(-1, 3), pa["TEXCOORD_0"], mane_mat)
+        world_normals = pa["NORMAL"] @ M[:3, :3].T
+        world_normals /= np.linalg.norm(world_normals, axis=1, keepdims=True)
+        add_mesh(bone, world, idx.reshape(-1, 3), pa["TEXCOORD_0"], mane_mat, world_normals)
     # in-game root motion can move the horse; centre it under the cameras
     lowest = posed[:, 1].min()
     for obj in bpy.context.scene.objects:
