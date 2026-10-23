@@ -1,4 +1,4 @@
-# Horse Mane & Tail improved
+# Horse Mane & Tail Rework
 
 Project Zomboid (Build 42) add-on for the [Horse mod](https://steamcommunity.com/sharedfiles/filedetails/?id=3661336777) that gives adult horses a new mane and tail.
 

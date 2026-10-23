@@ -16,7 +16,7 @@ import preview  # noqa: E402
 MOD_DIR = os.path.join(PROJECT, "Contents", "mods", "PZHorseManeAndTailImproved", "42")
 WORK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_work")
 FONT = r"C:\Windows\Fonts\arialbd.ttf"
-TITLE = ["HORSE MANE & TAIL", "IMPROVED"]
+TITLE = ["HORSE MANE & TAIL", "REWORK"]
 
 FRAME = (0.69, 0.19, 0.16)
 EDGE = (0.94, 0.88, 0.78)
@@ -80,7 +80,7 @@ def text_layer(size):
         cu.font = font
         cu.align_x = "CENTER"
         cu.size = 0.082
-        cu.offset = 0.003  # slight bold outline
+        cu.offset = 0.0
         cu.materials.append(mat)
         obj = bpy.data.objects.new(f"t{i}", cu)
         obj.location = (0, -0.305 - 0.095 * i, 0)
