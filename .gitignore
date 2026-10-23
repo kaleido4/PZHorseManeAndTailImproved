@@ -1,0 +1,4 @@
+__pycache__/
+blender/_work/
+# copies of the Horse mod's models, read by the build; not ours to redistribute as-is
+blender/reference/
