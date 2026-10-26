@@ -15,7 +15,7 @@ import preview  # noqa: E402
 
 MOD_DIR = os.path.join(PROJECT, "Contents", "mods", "PZHorseManeAndTailImproved", "42")
 WORK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_work")
-FONT = r"C:\Windows\Fonts\arialbd.ttf"
+FONT = r"C:\Windows\Fonts\seguisb.ttf"  # Segoe UI Semibold
 TITLE = ["HORSE MANE & TAIL", "REWORK"]
 
 FRAME = (0.69, 0.19, 0.16)

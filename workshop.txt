@@ -1,10 +1,13 @@
 version=1
+id=3825527404
 title=Horse Mane & Tail Rework
 description=New mane and tail models for the adult horses of the [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3661336777]Horse[/url] mod.
 description=
+description=Full credits for the original creator for the entire thing, my mod only brings new shapes for tail & mane. 
+description=
 description=Mares and stallions share the new models. Foals are unchanged.
 description=
-description=Requires the Horse mod, and must load after it.
+description=Requires the OG Horse mod, and must load after it. Mod order matters, Horse mod must ALWAYS be above this one.
 description=Safe to add to or remove from an existing save.
-tags=Build 42;Models;Realistic
+tags=Build 42;Animals;Farming;Misc;Models;Multiplayer;Realistic;Textures;QoL;WIP
 visibility=public
