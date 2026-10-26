@@ -36,6 +36,7 @@ VIEWS = {
     "face": ((-0.5, -2.4, 1.25), (0, -0.7, 1.0), 0.7),
     "head_low": ((-1.3, -1.2, 0.75), (0, -0.62, 0.38), 0.75),  # the head down while eating
     "poll": ((-1.4, -0.75, 1.2), (0, -0.62, 1.03), 0.38),
+    "game_rear": ((1.9, 2.3, 2.3), (0, 0.0, 0.55), 2.0),  # PZ-like camera from behind on the left
 }
 
 

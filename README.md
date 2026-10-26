@@ -23,6 +23,7 @@ The Horse mod builds a horse from a skinned body mesh plus seven mane items atta
 | `models_X/HorseManeTailImproved/ManeStart.glb`, `ManeMid1`-`5.glb`, `ManeEnd.glb` | one mane mesh per bone: three or four locks and a filler under them, 166-212 triangles |
 | `scripts/HorseManeTailImproved/mane_models.txt` | the models for those meshes, with `textures/HorseManeTailImproved/ManeStrands.png` |
 | `lua/client/HorseManeTailImproved/ManeModels.lua` | wraps the Horse mod's `ManeManager.setupMane` so each mane item of an adult horse shows the model for its bone (`InventoryItem:setStaticModel`). Foals keep the Horse mod's manes |
+| `lua/client/HorseManeTailImproved/ReloadBodies.lua` | reloads the mare and stallion bodies once the save has started (`reloadModelsMatching`), so they come from this mod even when it is only enabled on the save |
 
 The Horse mod's own mane models are not replaced, so foals look exactly as before.
 
@@ -36,6 +37,7 @@ Things worth knowing:
 - The mane and forelock are shaded with the normals of the hair mass, not of each lock (`mass_normals`): up on top of the crest, turning to face the side down the neck, and out from the head for the forelock. With each lock's own rounded normals the game's light shaded every lock like a shiny metal tube; this way they light together as one soft clump. The texture is kept light for the same reason, since the breed tint is multiplied into it.
 - The forelock is in the body mesh rather than on the end mane bone, because that bone turns up to 18° against the head while grazing (10° at the gallop) and lifted the forelock off the face. In the body it is skinned to `DEF_Head`, its root blended into the neck like the skin under it, and it uses the tail strips of the breed texture. Each point is wrapped onto the skin around the head's outline (`NeckSections.wrap`), so it lies on the face even where it flows down the side.
 - Removing the old tail leaves a small opening in the rump; it is capped with two triangles.
+- The game loads mods twice: the main menu's list, then the save's. The Horse mod uses the stallion body as its animation skeleton (`animationsMesh Horse`), so the stallion body is already read in the first pass. If this mod is only enabled on the save, that early copy is the Horse mod's own and the game keeps it: stallions showed the old tail while mares were fine. `ReloadBodies.lua` reloads both bodies once the save is running.
 - The tail has only three bones and ends around the hock, so everything below would swing with `DEF_Tail3` like a plank. Its lower part is partly weighted to `DEF_Spine1` (up to 30% at the cut), which makes it trail and droop when the tail lifts.
 
 ## Building
